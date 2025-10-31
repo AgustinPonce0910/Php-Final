@@ -1,6 +1,18 @@
 FROM php:8.1-apache
 
 RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    libzip-dev zip unzip git \
+    libpng-dev libjpeg-dev libonig-dev libxml2-dev \
+ && docker-php-ext-install pdo pdo_pgsql \
+ && a2enmod rewrite \
+ && rm -rf /var/lib/apt/lists/*
+
+# ... resto de tu Dockerfile (COPY, permisos, composer, etc.)
+
+
+
+RUN apt-get update && apt-get install -y \
     libzip-dev zip unzip git \
     libpng-dev libjpeg-dev libonig-dev libxml2-dev \
     default-mysql-client \
