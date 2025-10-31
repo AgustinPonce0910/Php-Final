@@ -1,26 +1,22 @@
 <?php
 require_once 'db.php';
-include "db.php";
 session_start();
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $dni = $_POST['dni'];
-    $contrasena = $_POST['contrasena'];
+    $dni = $_POST['dni'] ?? '';
+    $contrasena = $_POST['contrasena'] ?? '';
 
-    $sql = "SELECT * FROM users WHERE dni = '$dni'";
-    $result = $conn->query($sql);
+    // Usar PDO para preparar la consulta
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE dni = :dni");
+    $stmt->execute(['dni' => $dni]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($result->num_rows === 1) {
-        $user = $result->fetch_assoc();
-        if (password_verify($contrasena, $user['contrasena'])) {
-            $_SESSION['dni'] = $user['dni'];
-            header("Location: index.php");
-            exit();
-        } else {
-            $error = "Contraseña incorrecta.";
-        }
+    if ($user && password_verify($contrasena, $user['contrasena'])) {
+        $_SESSION['dni'] = $user['dni'];
+        header("Location: index.php");
+        exit();
     } else {
-        $error = "DNI no encontrado.";
+        $error = "DNI o contraseña incorrectos.";
     }
 }
 ?>
