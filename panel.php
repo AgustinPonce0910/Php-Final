@@ -6,65 +6,74 @@ if (!isset($_SESSION['acceso_panel']) || $_SESSION['acceso_panel'] !== true) {
     exit();
 }
 
-require 'db.php';
+require 'db.php'; // debe proporcionar $pdo (PDO conectado a la DB)
 
 $busqueda_nombre = $_GET['nombre'] ?? '';
 $busqueda_fecha = $_GET['fecha'] ?? '';
 
 $params = [];
-$sql = "SELECT u.nombre, u.dni, v.fecha, v.tipo, COUNT(*) as cantidad
+$sql = "SELECT u.nombre,
+               u.dni,
+               DATE(v.fecha) AS fecha_day,
+               v.tipo,
+               COUNT(*) AS cantidad
         FROM viandas v
         JOIN users u ON v.user_id = u.id
         WHERE 1=1";
 
 if (!empty($busqueda_nombre)) {
-    $sql .= " AND u.nombre ILIKE :nombre"; // ILIKE para búsqueda case-insensitive en PostgreSQL
-    $params['nombre'] = "%$busqueda_nombre%";
+    $sql .= " AND u.nombre ILIKE :nombre";
+    $params['nombre'] = "%{$busqueda_nombre}%";
 }
 
 if (!empty($busqueda_fecha)) {
+    // espera formato YYYY-MM-DD
     $sql .= " AND DATE(v.fecha) = :fecha";
     $params['fecha'] = $busqueda_fecha;
 }
 
-$sql .= " GROUP BY u.id, DATE(v.fecha), v.tipo
-          ORDER BY v.fecha DESC";
+$sql .= " GROUP BY u.nombre, u.dni, DATE(v.fecha), v.tipo
+          ORDER BY DATE(v.fecha) DESC";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
-$resumen_diario = [];
 
+$resumen_diario = [];
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-    $fecha = date('Y-m-d', strtotime($row['fecha']));
+    $fecha = $row['fecha_day']; // ya es YYYY-MM-DD
     $resumen_diario[$fecha][] = [
         'nombre' => $row['nombre'],
         'dni' => $row['dni'],
         'tipo' => ucfirst($row['tipo']),
-        'cantidad' => $row['cantidad'],
-        'costo' => $row['cantidad'] * 1500
+        'cantidad' => (int)$row['cantidad'],
+        'costo' => ((int)$row['cantidad']) * 1500
     ];
 }
 
-// Resumen mensual
+/* Resumen mensual */
 $sql_resumen_mensual = "
-    SELECT u.nombre, u.dni, EXTRACT(MONTH FROM v.fecha) AS mes, EXTRACT(YEAR FROM v.fecha) AS anio, COUNT(*) AS total_viandas
+    SELECT u.nombre,
+           u.dni,
+           EXTRACT(MONTH FROM v.fecha) AS mes,
+           EXTRACT(YEAR FROM v.fecha) AS anio,
+           COUNT(*) AS total_viandas
     FROM viandas v
     JOIN users u ON v.user_id = u.id
-    GROUP BY u.id, anio, mes
+    GROUP BY u.nombre, u.dni, anio, mes
     ORDER BY anio DESC, mes DESC
 ";
 
-$stmt_mensual = $pdo->query($sql_resumen_mensual);
+$stmt_mensual = $pdo->prepare($sql_resumen_mensual);
+$stmt_mensual->execute();
 $resumen_mensual = [];
-
 while ($row = $stmt_mensual->fetch(PDO::FETCH_ASSOC)) {
     $resumen_mensual[] = [
         'nombre' => $row['nombre'],
         'dni' => $row['dni'],
-        'mes' => $row['mes'],
-        'anio' => $row['anio'],
-        'cantidad' => $row['total_viandas'],
-        'total' => $row['total_viandas'] * 1500
+        'mes' => (int)$row['mes'],
+        'anio' => (int)$row['anio'],
+        'cantidad' => (int)$row['total_viandas'],
+        'total' => ((int)$row['total_viandas']) * 1500
     ];
 }
 ?>
