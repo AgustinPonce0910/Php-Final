@@ -1,6 +1,5 @@
 <?php
 include "db.php";
-
 session_start();
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -11,15 +10,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $seccion = $_POST['seccion'];
     $contrasena = password_hash($_POST['contrasena'], PASSWORD_DEFAULT);
 
-    $sql = "INSERT INTO users (nombre, apellido, correo, dni, seccion, contrasena)
-            VALUES ('$nombre', '$apellido', '$correo', '$dni', '$seccion', '$contrasena')";
+    try {
+        $sql = "INSERT INTO users (nombre, apellido, correo, dni, seccion, contrasena)
+                VALUES (:nombre, :apellido, :correo, :dni, :seccion, :contrasena)";
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindParam(':nombre', $nombre);
+        $stmt->bindParam(':apellido', $apellido);
+        $stmt->bindParam(':correo', $correo);
+        $stmt->bindParam(':dni', $dni);
+        $stmt->bindParam(':seccion', $seccion);
+        $stmt->bindParam(':contrasena', $contrasena);
 
-    if ($conn->query($sql) === TRUE) {
-        $_SESSION['registro_exitoso'] = "Registro completado exitosamente. Puede iniciar sesión con sus credenciales.";
-        header("Location: login.php");
-        exit();
-    } else {
-        $error = "Error en el registro: " . $conn->error;
+        if ($stmt->execute()) {
+            $_SESSION['registro_exitoso'] = "Registro completado exitosamente. Puede iniciar sesión con sus credenciales.";
+            header("Location: login.php");
+            exit();
+        } else {
+            $error = "Error en el registro.";
+        }
+    } catch (PDOException $e) {
+        $error = "Error en el registro: " . $e->getMessage();
     }
 }
 ?>
