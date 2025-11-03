@@ -5,9 +5,9 @@ $db   = getenv('DB_NAME') ?: 'login_system';
 $user = getenv('DB_USER') ?: 'root';
 $pass = getenv('DB_PASSWORD') ?: '';
 
-$dsn = "pgsql:host={$host};port={$port};dbname={$db};";
+$conn = "pgsql:host={$host};port={$port};dbname={$db};";
 try {
-    $pdo = new PDO($dsn, $user, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    $pdo = new PDO($conn, $user, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 } catch (PDOException $e) {
     die("Conexión fallida: " . $e->getMessage());
 }
