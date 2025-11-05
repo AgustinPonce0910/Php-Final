@@ -1,34 +1,39 @@
 <?php
-include "db.php";
 session_start();
+require_once 'db.php'; // debe definir $pdo (PDO)
 
 $mensaje = "";
 $error = "";
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $nombre = trim($_POST['nombre']);
-    $apellido = trim($_POST['apellido']);
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $nombre = trim($_POST['nombre'] ?? '');
+    $apellido = trim($_POST['apellido'] ?? '');
 
-    if (!empty($nombre) && !empty($apellido)) {
-        $sql = "SELECT dni, nombre, apellido FROM users WHERE LOWER(nombre) = LOWER(?) AND LOWER(apellido) = LOWER(?)";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ss", $nombre, $apellido);
-        $stmt->execute();
-        $result = $stmt->get_result();
+    if ($nombre !== '' && $apellido !== '') {
+        try {
+            // Consulta compatible con PostgreSQL; usamos ILIKE para evitar LOWER(...) si preferís
+            $sql = "SELECT dni, nombre, apellido FROM users WHERE LOWER(nombre) = LOWER(:nombre) AND LOWER(apellido) = LOWER(:apellido) LIMIT 1";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':nombre' => $nombre,
+                ':apellido' => $apellido
+            ]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($result->num_rows > 0) {
-            $user = $result->fetch_assoc();
-            $mensaje = "Usuario encontrado: " . htmlspecialchars($user['nombre']) . " " . htmlspecialchars($user['apellido']) . " - DNI: " . htmlspecialchars($user['dni']);
-        } else {
-            $error = "No se encontró ningún usuario con ese nombre y apellido.";
+            if ($user) {
+                $mensaje = "Usuario encontrado: " . htmlspecialchars($user['nombre']) . " " . htmlspecialchars($user['apellido']) . " - DNI: " . htmlspecialchars($user['dni']);
+            } else {
+                $error = "No se encontró ningún usuario con ese nombre y apellido.";
+            }
+        } catch (Exception $e) {
+            error_log("Error en recuperar.php: " . $e->getMessage());
+            $error = "Ocurrió un error al buscar el usuario. Intentá nuevamente.";
         }
-        $stmt->close();
     } else {
         $error = "Por favor, complete todos los campos.";
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="es">
 
@@ -97,5 +102,4 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
     </main>
 </body>
-
 </html>
