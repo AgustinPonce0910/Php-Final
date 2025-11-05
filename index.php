@@ -1,7 +1,7 @@
 <?php
 session_start();
-require 'db.php';
-require 'utils_viandas.php';
+require 'db.php'; // debe definir $pdo como instancia PDO
+require 'utils_viandas.php'; // debe aceptar $pdo en lugar de $conn
 
 $logueado = isset($_SESSION['dni']);
 $user_id = null;
@@ -9,11 +9,11 @@ $bloqueado = false;
 $pedido_activo = false;
 
 if ($logueado) {
-  ensure_vianda_utils($conn);
-  $user_id = get_user_id_by_dni($conn, $_SESSION['dni']);
+  ensure_vianda_utils($pdo); // función adaptada para PDO
+  $user_id = get_user_id_by_dni($pdo, $_SESSION['dni']);
   if ($user_id) {
-    $pedido_activo = tiene_pedido_ult_12h($conn, $user_id);
-    $bloqueado = $pedido_activo || en_cooldown_12h($conn, $user_id);
+    $pedido_activo = tiene_pedido_ult_12h($pdo, $user_id);
+    $bloqueado = $pedido_activo || en_cooldown_12h($pdo, $user_id);
   }
 }
 
@@ -22,6 +22,8 @@ $alerta_ok = $_SESSION['alerta_ok'] ?? null;
 $alerta_error = $_SESSION['alerta_error'] ?? null;
 unset($_SESSION['alerta_ok'], $_SESSION['alerta_error']);
 ?>
+
+
 <!DOCTYPE html>
 <html lang="es">
 
