@@ -2,12 +2,10 @@
 session_start();
 require 'db.php'; // debe definir $pdo como instancia PDO
 require 'utils_viandas.php'; // debe aceptar $pdo en lugar de $conn
-
 $logueado = isset($_SESSION['dni']);
 $user_id = null;
 $bloqueado = false;
 $pedido_activo = false;
-
 if ($logueado) {
   ensure_vianda_utils($pdo); // función adaptada para PDO
   $user_id = get_user_id_by_dni($pdo, $_SESSION['dni']);
@@ -16,7 +14,6 @@ if ($logueado) {
     $bloqueado = $pedido_activo || en_cooldown_12h($pdo, $user_id);
   }
 }
-
 // Gestionar alertas (éxito / error) una sola vez
 $alerta_ok = $_SESSION['alerta_ok'] ?? null;
 $alerta_error = $_SESSION['alerta_error'] ?? null;
@@ -24,7 +21,6 @@ unset($_SESSION['alerta_ok'], $_SESSION['alerta_error']);
 ?>
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -32,18 +28,12 @@ unset($_SESSION['alerta_ok'], $_SESSION['alerta_error']);
     Compañía de Ingenieros QBN Apoyo a las Emergencias 601</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-
 <body class="bg-patrol">
-
-
-
   <header class="">
         <a href="index.php">
             <img src="img/fondurri.png" class="military-header">
         </a>    <div class="nav-buttons">
-      <?php if (!$logueado): ?>
-
-
+      <?php if (!$logueado):?>
       <?php else: ?>
         <div class="user-status">
           <span class="status-verified">✓ VERIFICADO</span>
@@ -53,7 +43,6 @@ unset($_SESSION['alerta_ok'], $_SESSION['alerta_error']);
     </div>
     </div>
   </header>
-
   <?php if ($logueado): ?>
     <?php if ($alerta_ok): ?>
       <div class="alert alert-success">
@@ -65,14 +54,12 @@ unset($_SESSION['alerta_ok'], $_SESSION['alerta_error']);
         <?php echo htmlspecialchars($alerta_error); ?>
       </div>
     <?php endif; ?>
-
     <!-- Updated main content with military card styling -->
     <main class="main-content">
       <div class="card">
         <div class="card-header">
           <h3>SELECCIÓN DE VIANDAS</h3>
         </div>
-
         <div class="card-body">
           <?php if (!$bloqueado): ?>
             <form action="elegir_vianda.php" method="POST" class="vianda-form">
@@ -126,9 +113,6 @@ unset($_SESSION['alerta_ok'], $_SESSION['alerta_error']);
           </form>
         </div>
       </div>
-
-      <!-- Updated panel access button with military styling -->
-
     </main>
   <?php else: ?>
     <!-- Added welcome section for non-logged users -->
@@ -150,8 +134,6 @@ unset($_SESSION['alerta_ok'], $_SESSION['alerta_error']);
         </div>
       </div>
     </main>
-  <?php endif; ?>
-
+  <?php endif;?>
 </body>
-
 </html>
