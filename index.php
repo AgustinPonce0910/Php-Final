@@ -22,8 +22,6 @@ $alerta_ok = $_SESSION['alerta_ok'] ?? null;
 $alerta_error = $_SESSION['alerta_error'] ?? null;
 unset($_SESSION['alerta_ok'], $_SESSION['alerta_error']);
 ?>
-
-
 <!DOCTYPE html>
 <html lang="es">
 
