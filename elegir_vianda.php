@@ -27,46 +27,69 @@
 
 <?php
 session_start();
-include "db.php";
-include "utils_viandas.php";
+require 'db.php';           // debe definir $pdo (PDO)
+require 'utils_viandas.php';// funciones adaptadas a PDO: ensure_vianda_utils, get_user_id_by_dni, etc.
 
 if (!isset($_SESSION['dni'])) {
     header("Location: login.php");
     exit();
 }
 
-ensure_vianda_utils($conn);
+// Asegurarse de utilidades (crea tabla ultimo_pedido si hace falta)
+ensure_vianda_utils($pdo);
 
 $dni = $_SESSION['dni'];
 $viandas = $_POST['vianda'] ?? [];
 
 if (!empty($viandas)) {
-    $user_id = get_user_id_by_dni($conn, $dni);
+    $user_id = get_user_id_by_dni($pdo, $dni);
     if ($user_id) {
 
         // Bloqueo por 12 horas si ya pidió recientemente (aunque haya cancelado)
-        if (en_cooldown_12h($conn, $user_id) || tiene_pedido_ult_12h($conn, $user_id)) {
+        if (en_cooldown_12h($pdo, $user_id) || tiene_pedido_ult_12h($pdo, $user_id)) {
             $_SESSION['alerta_error'] = "Ya realizaste un pedido recientemente. Solo podés hacer otro pasadas 12 horas.";
             header("Location: index.php");
             exit();
         }
 
-        foreach ($viandas as $tipo) {
-            $tipo = $conn->real_escape_string($tipo);
-            // Insert con fecha por defecto (CURRENT_TIMESTAMP)
-            $conn->query("INSERT INTO viandas (user_id, tipo) VALUES ($user_id, '$tipo')");
+        try {
+            // Empezar transacción para insertar todas las viandas
+            $pdo->beginTransaction();
+
+            $stmt = $pdo->prepare("INSERT INTO viandas (user_id, tipo) VALUES (:uid, :tipo)");
+            foreach ($viandas as $tipo) {
+                // Normalizar/validar tipo si es necesario
+                $tipo_clean = trim((string)$tipo);
+                $stmt->execute([
+                    'uid' => $user_id,
+                    'tipo' => $tipo_clean
+                ]);
+            }
+
+            // Registrar cooldown (upsert)
+            registrar_ultimo_pedido($pdo, $user_id);
+
+            $pdo->commit();
+
+            $_SESSION['alerta_ok'] = "Pedido enviado con éxito ✔️";
+            header("Location: index.php?success=1");
+            exit();
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            // Loggear $e->getMessage() si querés, y mostrar mensaje genérico al usuario
+            $_SESSION['alerta_error'] = "Error al procesar el pedido. Intentá nuevamente.";
+            header("Location: index.php");
+            exit();
         }
-
-        // Registrar cooldown
-        registrar_ultimo_pedido($conn, $user_id);
-
-        // Mensaje de éxito (estilo 'PedidoYa')
-        $_SESSION['alerta_ok'] = "Pedido enviado con éxito ✔️";
-        header("Location: index.php?success=1");
+    } else {
+        $_SESSION['alerta_error'] = "Usuario no encontrado.";
+        header("Location: index.php");
         exit();
     }
 }
 
+// Si no envió viandas, redirigir al índice
 header("Location: index.php");
 exit();
-?>
