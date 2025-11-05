@@ -1,52 +1,60 @@
 <?php
-function ensure_vianda_utils($conn)
+function ensure_vianda_utils(PDO $pdo)
 {
-    // Tabla para almacenar el último momento en que el usuario HIZO un pedido (aunque luego cancele)
-    $conn->query("
+    // Crea la tabla 'ultimo_pedido' si no existe
+    $sql = "
         CREATE TABLE IF NOT EXISTS ultimo_pedido (
-            user_id INT PRIMARY KEY,
+            user_id INTEGER PRIMARY KEY,
             ultimo TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             CONSTRAINT fk_ultimo_pedido_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
+        );
+    ";
+    $pdo->exec($sql);
+}
+
+function get_user_id_by_dni(PDO $pdo, string $dni): ?int
+{
+    $stmt = $pdo->prepare("SELECT id FROM users WHERE dni = :dni LIMIT 1");
+    $stmt->execute(['dni' => $dni]);
+    $row = $stmt->fetch();
+    return $row ? (int)$row['id'] : null;
+}
+
+function tiene_pedido_ult_12h(PDO $pdo, int $user_id): bool
+{
+    $stmt = $pdo->prepare("
+        SELECT 1 FROM viandas
+        WHERE user_id = :uid AND fecha >= NOW() - INTERVAL '12 hours'
+        LIMIT 1
     ");
+    $stmt->execute(['uid' => $user_id]);
+    return (bool)$stmt->fetchColumn();
 }
 
-function get_user_id_by_dni($conn, $dni)
+function en_cooldown_12h(PDO $pdo, int $user_id): bool
 {
-    $dni = $conn->real_escape_string($dni);
-    $res = $conn->query("SELECT id FROM users WHERE dni = '$dni' LIMIT 1");
-    if ($res && $res->num_rows === 1) {
-        $row = $res->fetch_assoc();
-        return intval($row['id']);
-    }
-    return null;
-}
-
-function tiene_pedido_ult_12h($conn, $user_id)
-{
-    // Revisa pedidos registrados en 'viandas' en las últimas 12 horas
-    $sql = "SELECT 1 FROM viandas WHERE user_id = $user_id AND fecha >= (NOW() - INTERVAL 12 HOUR) LIMIT 1";
-    $res = $conn->query($sql);
-    return ($res && $res->num_rows > 0);
-}
-
-function en_cooldown_12h($conn, $user_id)
-{
-    // Revisa la tabla 'ultimo_pedido' para aplicar el cooldown aunque el usuario cancele
-    $sql = "SELECT ultimo, (NOW() < DATE_ADD(ultimo, INTERVAL 12 HOUR)) AS bloqueado
-            FROM ultimo_pedido WHERE user_id = $user_id LIMIT 1";
-    $res = $conn->query($sql);
-    if ($res && $res->num_rows === 1) {
-        $row = $res->fetch_assoc();
-        return intval($row['bloqueado']) === 1;
+    $stmt = $pdo->prepare("
+        SELECT ultimo FROM ultimo_pedido
+        WHERE user_id = :uid LIMIT 1
+    ");
+    $stmt->execute(['uid' => $user_id]);
+    $row = $stmt->fetch();
+    if ($row) {
+        $ultimo = strtotime($row['ultimo']);
+        $ahora = time();
+        return ($ahora < $ultimo + 12 * 3600); // 12 horas en segundos
     }
     return false;
 }
 
-function registrar_ultimo_pedido($conn, $user_id)
+function registrar_ultimo_pedido(PDO $pdo, int $user_id): void
 {
-    // Upsert del timestamp del último pedido
-    $conn->query("INSERT INTO ultimo_pedido (user_id, ultimo) VALUES ($user_id, NOW())
-                  ON DUPLICATE KEY UPDATE ultimo = NOW()");
+    // PostgreSQL no tiene ON DUPLICATE KEY UPDATE, usamos UPSERT con ON CONFLICT
+    $stmt = $pdo->prepare("
+        INSERT INTO ultimo_pedido (user_id, ultimo)
+        VALUES (:uid, NOW())
+        ON CONFLICT (user_id) DO UPDATE SET ultimo = NOW()
+    ");
+    $stmt->execute(['uid' => $user_id]);
 }
 ?>
